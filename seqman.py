@@ -144,6 +144,7 @@ get_parser.add_argument("-li", "--list", help = "sequence list");
 get_parser.add_argument("-ft", "--features", help = "get sequence by features", nargs= "+");
 
 split_parser = subpar.add_parser("split", help = "split a bundle squence to a single sequence file", parents=[pparser]);
+split_parser.add_argument("-di", "--dir", help = "split sequence into dir", default = ".");
 
 cut_parser = subpar.add_parser("cut", help = "cut a sequence", parents=[pparser]);
 cut_parser.add_argument("-st", "--start", help = "sequence start", required = "yes", type = int, default = 1);
