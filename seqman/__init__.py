@@ -1,18 +1,68 @@
+#! /usr/bin/env python
+# -*- coding: utf-8 -*-
+# vim:fenc=utf-8
+#
+# Copyright © 2020,  Magic Fang, magicfang@gmail.com
+#
+# Distributed under terms of the GPL-3 license.
+
+
 import argparse;
 import sys;
+import re;
+import gzip;
+import bz2;
+from random import randint;
 from seqman.consts import *;
 
-__all__ = ["commands", "consts", "argparser"];
+__all__ = ["commands", "consts", "seqfilter", "argparser", "genseq", "filehandle", "close"];
 
+def genseq(size):
+	seq = "";
+	for i in range(size):
+		seq += NUCLS[randint(0, len(NUCLS)-1)];
+	return seq;
 
+def filehandle(fh, fn, mode):
+	if fn == "stdout" or fh == sys.stdout:
+		return sys.stdout;
+	elif fn == "stdin" or fh == sys.stdin:
+		if sys.stdin.isatty():
+			return None;
+		else:
+			return sys.stdin;
+	elif fn == "stderr" or fh == sys.stderr:
+		return sys.stderr;
+	else:
+		try:
+#			if re.match(r'\.gz$', fn):
+#				fh = gzip.open(fn, mode+"b");
+#			elif re.match(r'\.bz2$', fn):
+#				fh = bz2.open(fn, mode+"b");
+#			else:
+			fh = open(fn, mode);
+			return fh;
+		except:
+			return None;
+
+def close(fh):
+	if fh == sys.stderr or fh == sys.stdin or sys.stdout:
+		return True;
+	else:
+		try:
+			fh.close();
+			return True;
+		except:
+			return False;
+
+		
 def argparser(parser = False):
 	pparser = argparse.ArgumentParser(add_help=False);
 	pparser.add_argument("-in", "--infile", help = "input file", default = sys.stdin);
 	pparser.add_argument("-ou", "--output", help = "output file name", default = sys.stdout);
 	pparser.add_argument("-if", "--format", help = "sequence file format", default = "fasta");
 	pparser.add_argument("-of", "--oformat", help = "output sequence format");
-	pparser.add_argument("-le", "--len", help = "length filter");
-	pparser.add_argument("-gc", "--gc", help = "gc filter");
+	pparser.add_argument("-fi", "--filter", help = "sequence filter", nargs = "*");
 	pparser.add_argument("-vo", "--verbose", action = "store_true", help = "verbose output to stderr");
 	pparser.add_argument("-al", "--alphabet", choices = ALPHABET.keys(), help = "sequence alphabet", default = "dna");
 	pparser.add_argument("-lo", "--lower", action = "store_true", help = "get lower case sequence");
@@ -47,13 +97,18 @@ def argparser(parser = False):
 	cut_parser.add_argument("-fr", "--frequency", help = "cut times", type = int, default = 1);
 	cut_parser.add_argument("-ml", "--minlen", help = "mix cut length", type = int, default = 10);
 	cut_parser.add_argument("-xl", "--maxlen", help = "max cut length", type = int, default = 100);
+	cut_parser.add_argument("-re", "--reverse", help = "cut and concate sequence", action = "store_true");
 	
 	tran_parser = subpar.add_parser("translate", help = "translate dna to protein, or in 6 frames", parents = [pparser]);
 	tran_parser.add_argument("-f6", "--six", help = "translate in 6 frames", action = "store_true");
 	tran_parser.add_argument("-ct", "--codon", help = "codon table for translation", choices = CODON.keys(), default = "Standard");
 	tran_parser.add_argument("-lc", "--list", help = "list codon table", action = "store_true");
-	
-	tran_parser = subpar.add_parser("transcribe", help = "transcribe dna to rna or backward", parents = [pparser]);
+	tran_parser.add_argument("-st", "--start", help = "start translate", type = int);
+	tran_parser.add_argument("-en", "--end", help = "start translate", type = int);
+	tran_parser.add_argument("-fr", "--frame", help = "start translate", type = int);
+
+
+	trab_parser = subpar.add_parser("transcribe", help = "transcribe dna to rna or backward", parents = [pparser]);
 	
 	rev_parser = subpar.add_parser("transform", help = "reverse and complimant sequence", parents = [pparser]);
 	rev_parser.add_argument("-rv", "--reverse", help = "reverse sequence", action = "store_true");
@@ -70,9 +125,17 @@ def argparser(parser = False):
 	mut_parser.add_argument("-ra", "--random", help = "random mutation length", action = "store_true");
 	mut_parser.add_argument("-rf", "--ran_freq", help = "random mutation frequency", action = "store_true");
 	mut_parser.add_argument("-ir", "--min_random", help = "min mutation length", default = 1, type = int);
-	mut_parser.add_argument("-xr", "--max_random", help = "max mutation length", default = 1, type = int);
+	mut_parser.add_argument("-xr", "--max_random", help = "max mutation length", default = 10, type = int);
 	mut_parser.add_argument("-si", "--single", help = "output single mutation sequence", action = "store_true");
-	
+	mut_parser.add_argument("-sy", "--stype", help = "output single mutation type sequence", action = "store_true");
+	mut_parser.add_argument("-sq", "--seq", help = "seq to insert, sv or cnv");
+	mut_parser.add_argument("-cf", "--cnv_freq", help = "cnv repeat times", default = 10, type = int);
+	mut_parser.add_argument("-st", "--start", help = "start location for ins, del, sv and cnv", type = int);
+	mut_parser.add_argument("-en", "--end", help = "end location for del, sv and cnv", type = int);
+	mut_parser.add_argument("-rv", "--reverse", help = "reverse sequence", action = "store_true");
+	mut_parser.add_argument("-co", "--complement", help = "get complememt sequence", action = "store_true");
+	mut_parser.add_argument("-rc", "--rev_com", help = "get reverse complememt sequence", action = "store_true");
+
 	cnm_parser = subpar.add_parser("chgname", help = "change sequence name", parents = [pparser]);
 	cnm_parser.add_argument("-or", "--origin", help = "seq id to be changed");
 	cnm_parser.add_argument("-to", "--to", help = "seq changed to name");
