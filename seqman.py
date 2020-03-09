@@ -11,7 +11,7 @@ sys.path.append("/Users/magic/bin/seqman");
 from Bio import SeqIO;
 from seqman.consts import *;
 from seqman.commands import *;
-from seqman import argparser, filehandle, close;
+from seqman import argparser, getfh, close;
 from seqman.seqfilter import seqfilter;
 
 parser = argparser(True);
@@ -23,8 +23,8 @@ if not cmd:
 
 # ifh: Input file handle, ofh: Output file handle
 (ifh, ofh) = (args.infile, args.output);
-ifh = filehandle(ifh, args.infile, "r");
-ofh = filehandle(ofh, args.output, "w");
+ifh = getfh(args.infile, "rt");
+ofh = getfh(args.output, "wt");
 if not ifh or not ofh:
 	parser.error("input or output file error");
 
@@ -32,8 +32,6 @@ if not ifh or not ofh:
 if not args.oformat:
 	args.oformat = args.format;
 
-
-# Main program
 for seq in SeqIO.parse(ifh, args.format, alphabet = ALPHABET[args.alphabet]):
 	if args.upper or args.lower:
 		seq = fil.upperlower(seq);
