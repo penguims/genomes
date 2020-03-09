@@ -7,15 +7,11 @@
 # Distributed under terms of the GPL-3 license.
 
 
-import argparse;
-import sys;
-import re;
-import gzip;
-import bz2;
+import argparse, sys, gzip, bz2;
 from random import randint;
 from seqman.consts import *;
 
-__all__ = ["commands", "consts", "seqfilter", "argparser", "genseq", "filehandle", "close"];
+__all__ = ["commands", "consts", "seqfilter", "argparser", "getfh", "close", "genseq"];
 
 def genseq(size):
 	seq = "";
@@ -23,43 +19,41 @@ def genseq(size):
 		seq += NUCLS[randint(0, len(NUCLS)-1)];
 	return seq;
 
-def filehandle(fh, fn, mode):
-	if fn == "stdout" or fh == sys.stdout:
+def getfh(fn, mode):
+	if fn == "stdout":
 		return sys.stdout;
-	elif fn == "stdin" or fh == sys.stdin:
+	elif fn == "stdin":
 		if sys.stdin.isatty():
 			return None;
 		else:
 			return sys.stdin;
-	elif fn == "stderr" or fh == sys.stderr:
+	elif fn == "stderr":
 		return sys.stderr;
 	else:
 		try:
-#			if re.match(r'\.gz$', fn):
-#				fh = gzip.open(fn, mode+"b");
-#			elif re.match(r'\.bz2$', fn):
-#				fh = bz2.open(fn, mode+"b");
-#			else:
-			fh = open(fn, mode);
-			return fh;
+			if fn[-3:] == ".gz":
+				return gzip.open(fn, mode);
+			elif fn[-4:] == ".bz2":
+				return bz2.open(fn, mode);
+			else:
+				return open(fn, mode);
 		except:
 			return None;
 
 def close(fh):
-	if fh == sys.stderr or fh == sys.stdin or sys.stdout:
-		return True;
-	else:
-		try:
-			fh.close();
-			return True;
-		except:
-			return False;
+    if fh == sys.stderr or fh == sys.stdin or sys.stdout:
+        return True;
+    else:
+        try:
+            fh.close();
+            return True;
+        except:
+            return False;
 
-		
 def argparser(parser = False):
 	pparser = argparse.ArgumentParser(add_help=False);
-	pparser.add_argument("-in", "--infile", help = "input file", default = sys.stdin);
-	pparser.add_argument("-ou", "--output", help = "output file name", default = sys.stdout);
+	pparser.add_argument("-in", "--infile", help = "input file", default = "stdin");
+	pparser.add_argument("-ou", "--output", help = "output file name", default = "stdout");
 	pparser.add_argument("-if", "--format", help = "sequence file format", default = "fasta");
 	pparser.add_argument("-of", "--oformat", help = "output sequence format");
 	pparser.add_argument("-fi", "--filter", help = "sequence filter", nargs = "*");

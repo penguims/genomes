@@ -67,7 +67,7 @@ class seqfilter:
 		return None;
 
 	def check(self, seq):
-		if self.filter:
+		if len(self.items) > 0:
 			return self.checklen(seq) and self.checkgc(seq);
 		else:
-			return False;
+			return True;

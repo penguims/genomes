@@ -9,6 +9,7 @@
 import sys;
 import os;
 import argparse;
+import bz2;
 from random import randint;
 from Bio.Seq import Seq;
 from Bio.SeqRecord import SeqRecord;
