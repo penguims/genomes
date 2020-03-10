@@ -7,7 +7,6 @@
 # Distributed under terms of the GPL-3 license.
 
 import sys;
-sys.path.append("/Users/magic/bin/seqman");
 from Bio import SeqIO;
 from seqman import argparser, getfh, close;
 from seqman.consts import *;
