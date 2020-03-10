@@ -21,10 +21,10 @@ class seqfilter:
 				if res:
 					self.items.append([res.group(1), res.group(2), float(res.group(3))]);
 	
-	def upper(self, seq):
+	def upperseq(self, seq):
 		return seq.upper();
 	
-	def lower(self, seq):
+	def lowerseq(self, seq):
 		return seq.lower();
 	
 	def _compare(self, val1, opr, val2):
@@ -61,9 +61,9 @@ class seqfilter:
 	
 	def upperlower(self, seq):
 		if self.upper:
-			return self.upper(seq);
+			return self.upperseq(seq);
 		elif self.lower:
-			return self.lower(seq);
+			return self.lowerseq(seq);
 		return None;
 
 	def check(self, seq):

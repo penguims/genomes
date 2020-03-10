@@ -61,26 +61,30 @@ def argparser(parser = False):
 	pparser.add_argument("-al", "--alphabet", choices = ALPHABET.keys(), help = "sequence alphabet", default = "dna");
 	pparser.add_argument("-lo", "--lower", action = "store_true", help = "get lower case sequence");
 	pparser.add_argument("-up", "--upper", action = "store_true", help = "get upper case sequence");
-	
+	pparser.add_argument("-sh", "--show", help = "show codon table, file format etc", choices = SHOWITEM.keys(), nargs = "*");
+	pparser.add_argument("-lg", "--log", help = "logging the works", action = "store_true");
+
 	cparser = argparse.ArgumentParser();
-	subpar = cparser.add_subparsers(dest = "command");
+	subpar = cparser.add_subparsers(dest = "command", required = "yes");
 	
 	stat_parser = subpar.add_parser("stat", help = "list sequences stat information", parents=[pparser]);
+	stat_parser.add_argument("-id", "--seqid", help = "get seqid", action = "store_false");
+	stat_parser.add_argument("-ln", "--length", help = "get sequence length", action = "store_false");
 	stat_parser.add_argument("-ds", "--desc", help = "no description when stat", action = "store_true");
 	stat_parser.add_argument("-mw", "--weight", help = "molecular weight", action = "store_true");
-	stat_parser.add_argument("-3g", "--gc123", help = "3 position gc content", action = "store_true");
+	stat_parser.add_argument("-gc", "--gc", help = "gc content", choices = ["gc", "gc123"], default = "gc");
 	stat_parser.add_argument("-ck", "--checksum", help = "seqeucne checksum", choices=CHECKSUM.keys(), default = "seguid");
-	stat_parser.add_argument("-ip", "--isopoint", help = "isoelectric point", action = "store_true");
-	stat_parser.add_argument("-mp", "--meltpoint", help = "melting point", action = "store_true")
-	stat_parser.add_argument("-ic", "--icc", help = "local component complecity", action = "store_true");
+	stat_parser.add_argument("-lc", "--lcc", help = "local component complecity, simp or mult:#");
 	
 	get_parser = subpar.add_parser("get", help = "get a sequence by a name or a list", parents=[pparser]);
-	get_parser.add_argument("-nm", "--name", help = "sequence to get");
-	get_parser.add_argument("-li", "--list", help = "sequence list");
-	get_parser.add_argument("-ft", "--features", help = "get sequence by features", nargs= "+");
+	get_group = get_parser.add_mutually_exclusive_group(required=True);
+	get_group.add_argument("-nm", "--name", help = "sequence to get");
+	get_group.add_argument("-li", "--list", help = "sequence list");
+	get_group.add_argument("-ft", "--features", help = "get sequence by features", nargs= "+");
 	
 	split_parser = subpar.add_parser("split", help = "split a bundle squence to a single sequence file", parents=[pparser]);
 	split_parser.add_argument("-di", "--dir", help = "split sequence into dir", default = ".");
+	split_parser.add_argument("-nu", "--number", help = "split number of sequences in one file", default = 1, type = int);
 	
 	cut_parser = subpar.add_parser("cut", help = "cut a sequence", parents=[pparser]);
 	cut_parser.add_argument("-st", "--start", help = "sequence start", type = int, default = 1);
@@ -94,12 +98,13 @@ def argparser(parser = False):
 	cut_parser.add_argument("-re", "--reverse", help = "cut and concate sequence", action = "store_true");
 	
 	tran_parser = subpar.add_parser("translate", help = "translate dna to protein, or in 6 frames", parents = [pparser]);
-	tran_parser.add_argument("-f6", "--six", help = "translate in 6 frames", action = "store_true");
 	tran_parser.add_argument("-ct", "--codon", help = "codon table for translation", choices = CODON.keys(), default = "Standard");
 	tran_parser.add_argument("-lc", "--list", help = "list codon table", action = "store_true");
-	tran_parser.add_argument("-st", "--start", help = "start translate", type = int);
 	tran_parser.add_argument("-en", "--end", help = "start translate", type = int);
-	tran_parser.add_argument("-fr", "--frame", help = "start translate", type = int);
+	tran_group = tran_parser.add_mutually_exclusive_group(required=True);
+	tran_group.add_argument("-st", "--start", help = "start translate", type = int);
+	tran_group.add_argument("-f6", "--six", help = "translate in 6 frames", action = "store_true");
+	tran_group.add_argument("-fr", "--frame", help = "start translate", type = int);
 
 
 	trab_parser = subpar.add_parser("transcribe", help = "transcribe dna to rna or backward", parents = [pparser]);
@@ -111,7 +116,7 @@ def argparser(parser = False):
 	conv_parser = subpar.add_parser("convert", help = "convert from one format to another", parents = [pparser]);
 	
 	mut_parser = subpar.add_parser("mutation", help = "make mutation on sequences", parents = [pparser]);
-	mut_parser.add_argument("-tp", "--type", help = "mutation type", nargs = "+", choices = MUTYPE);
+	mut_parser.add_argument("-tp", "--type", help = "mutation type", nargs = "+", choices = MUTYPE, required = "yes");
 	mut_parser.add_argument("-fr", "--frequency", help = "mutation frequency", default = 1, type = int);
 	mut_parser.add_argument("-fc", "--force", help = "force snp to be not same mutation", action = "store_true");
 	mut_parser.add_argument("-ln", "--length", help = "common length to INS, DEL, SV and CNV", default = 1, type = int);
@@ -131,9 +136,10 @@ def argparser(parser = False):
 	mut_parser.add_argument("-rc", "--rev_com", help = "get reverse complememt sequence", action = "store_true");
 
 	cnm_parser = subpar.add_parser("chgname", help = "change sequence name", parents = [pparser]);
-	cnm_parser.add_argument("-or", "--origin", help = "seq id to be changed");
 	cnm_parser.add_argument("-to", "--to", help = "seq changed to name");
-	cnm_parser.add_argument("-li", "--list", help = "sequnce list: from_id to_id");
+	cnm_group = cnm_parser.add_mutually_exclusive_group(required=True);
+	cnm_group.add_argument("-or", "--origin", help = "seq id to be changed");
+	cnm_group.add_argument("-li", "--list", help = "sequnce list: from_id to_id");
 	cnm_parser.add_argument("-kp", "--keep", help = "keep origin seq id", action = "store_true");
 	
 	if parser:

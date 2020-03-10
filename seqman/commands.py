@@ -9,24 +9,33 @@
 import sys;
 import os;
 import argparse;
-import bz2;
+import re;
 from random import randint;
 from Bio.Seq import Seq;
 from Bio.SeqRecord import SeqRecord;
 from Bio.SeqFeature import SeqFeature, FeatureLocation;
 from Bio import SeqUtils;
+from Bio.SeqUtils.lcc import *;
 from seqman.consts import CHECKSUM, ALPHABET, CODON, NUCLS;
 from seqman import genseq;
 
 CMDS = ("get", "cut", "split", "stat", "chgname", "translate", "transcribe", "transform", "convert", "mutation");
 
+"""
+The core module of seqman to deal with sub command.
+"""
+
+# cmdstr: cmmmand string defined in CMDS const
+# args: command option namespace, directly from argparser
 def commands(cmdstr, args):
+	'Factory function to generate command class'
 	if cmdstr in CMDS:
 		return globals()[cmdstr](args);
 	else:
 		return None;
 
 class mutation:
+	'Sequence mutation class, support snp, ins, del, sv and cnv'
 	def __init__(self, args):
 		self.type = args.type;
 		self.freq = args.frequency;
@@ -47,36 +56,51 @@ class mutation:
 		self.reverse = args.reverse;
 		self.complement = args.complement;
 		self.rev_com = args.rev_com;
+	# Internal method to insert a flagment into mutable sequence
+	# museq:	Bio.MutableSeq
+	# p:		location
+	# iseq:		sequence to insert
 	def _insert(self, museq, p, iseq):
 		if p == 0:
 			return iseq+museq;
 		else:
 			return museq[0:p]+iseq+museq[p:];
+	# Internal method to delete a flagment from a mutable sequence
+	# museq:	Bio.MutableSeq
+	# p:		locaiton
+	# rlen:		flagment length to be deleted
 	def _delete(self, museq, p, rlen):
 		if p == 0:
 			return museq[rlen:];
 		else:
 			return museq[0:p]+museq[p+rlen:];
+	# Generate SNP mutaion for a mutable sequence
+	# seq: 	Bio.SeqRecord
 	def snp(self, seq):
 		museq = seq.seq.tomutable();
 		p = randint(0, len(museq)-1);
 		if getattr(self, "start", True):
 			p = self.start;
 		ns = NUCLS[0:];
+		# Force to generate nosynonymous mutation
 		if self.force:
 			ns.remove(museq[p].upper());
 		tmp = museq[p];
 		museq[p]=ns[randint(0, len(ns)-1)];
 		vstr = "{}:{}->{}".format(p, tmp, museq[p]);
+		# For debug
 		if self.verbose:
 			print(vstr, file = sys.stderr);
 		return SeqRecord(museq.toseq(), id = seq.id, description = vstr+" "+seq.description);
+	# Generate deletion from a mutable sequence
+	# seq:		Bio.SeqRecord
 	def ins(self, seq):
 		(rlen, museq) = (self.length, seq.seq.tomutable());
 		p = randint(0, len(seq)-1);
 		if getattr(self, "start", True):
 			p = self.start;
 		tmp = self.seq;
+		# Generate a random insert flagment
 		if not getattr(self, "seq", True):
 			tmp = genseq(rlen);
 		museq = self._insert(museq, p, tmp);
@@ -86,6 +110,8 @@ class mutation:
 			print(("{:>"+str(p+rlen)+"}").format(vstr), file = sys.stderr);
 			print(museq, file = sys.stderr);
 		return SeqRecord(museq.toseq(), id = seq.id, description = vstr+" "+seq.description);
+	# Delete mutation
+	# seq:		Bio.SeqRecord
 	def delete(self, seq):
 		(p, rlen, museq) = (0, self.length, seq.seq.tomutable());
 		if getattr(self, "start", True):
@@ -94,6 +120,7 @@ class mutation:
 				rlen = self.end - self.start + 1;
 		else:
 			p = randint(0, len(museq)-1-rlen);
+		# Check if sequence length less than delete flagment length
 		if len(museq) <= rlen:
 			print("Sequence {} length deleted to be zero!".format(seq.id), file = sys.stderr);
 			exit(1);
@@ -105,6 +132,8 @@ class mutation:
 			print(("{:>"+str(p+rlen)+"}").format(vstr), file = sys.stderr);
 			print(museq, file = sys.stderr);
 		return SeqRecord(museq.toseq(), id = seq.id, description = vstr+" "+seq.description);
+	# Structure variation 
+	# seq: 		Bio.SeqRecord
 	def sv(self, seq):
 		(p, rlen, museq) = (0, self.length, seq.seq.tomutable());
 		if getattr(self, "start", True):
@@ -115,6 +144,7 @@ class mutation:
 			p = randint(0, len(museq)-1-rlen);
 		tmp = museq[p:p+rlen];
 		otmp = tmp[0:];
+		# Variation flagment is reverse, complement  or rev-complement
 		if self.reverse:
 			tmp.reverse();
 		elif self.complement:
@@ -129,10 +159,12 @@ class mutation:
 		vstr = "{}:{}->{}".format(tmp, p, t);
 		if otmp != tmp:
 			vstr = "{}->{}:{}->{}".format(otmp, tmp, p, t);
+		# To be implemented
 		if self.verbose:
 			pass;
 		return SeqRecord(museq.toseq(), id = seq.id, description = vstr+" "+seq.description);
-			
+	# Copy number variation
+	# seq:		Bio.Seqrecord
 	def cnv(self, seq):
 		museq = seq.seq.tomutable();
 		fr = self.cnv_freq;
@@ -144,12 +176,15 @@ class mutation:
 		else:
 			p = randint(0, len(seq)-1-rlen);
 		tmp = self.seq;
+		# Check if internal copy number or out sourced
 		if not self.seq:
 			tmp = museq[p:p+rlen];
 			fr -= 1;
 		vstr = "{}:{}*{}".format(p, tmp, fr);
 		museq = self._insert(museq, p, tmp*fr);
 		return SeqRecord(museq.toseq(), id = seq.id, description = vstr+" "+seq.description);
+	# Method for factory
+	# seq:		Bio.SeqRecord
 	def run(self, seq):
 		seqs = [];
 		mseq = seq[0:];
@@ -170,12 +205,15 @@ class mutation:
 					mseq = self.sv(mseq);
 				elif t == "cnv":
 					mseq = self.cnv(mseq);
+				# One mutation per sequence
 				if self.single:
 					seqs.append(mseq);
 					mseq = seq[0:];
+			# One type of mutation per sequence
 			if self.stype and not self.single:
 				seqs.append(mseq);
 				mseq = seq[0:];
+		# Accumulated mutation in a sequence
 		if not (self.single or self.stype):
 			seqs.append(mseq);
 		return seqs;
@@ -216,7 +254,7 @@ class translate:
 			museq = museq[start:end];
 			return museq.translate(table = CODON[self.codon], id = True, description = True);
 
-class trascribe:
+class transcribe:
 	def __init__(self, args):
 		self.alphabet = args.alphabet;
 	def run(self, seq):
@@ -252,15 +290,13 @@ class chgname:
 		self.list = args.list;
 		self.keep = args.keep;
 		self.ndict = {};
-		try:
+		if self.list:
 			fh = open(self.list, "r");
 			for ln in fh.readlines():
 				ln = ln.strip();
 				tmp = ln.split("\t");
 				self.ndict[tmp[0]] = tmp[1];
 			fh.close();
-		except:
-			print("Can not open list file: "+self.list, file = sys.stderr);
 		if self.origin and self.to:
 			self.ndict[self.origin] = self.to;
 
@@ -376,35 +412,62 @@ class get:
 			return False;
 		else:
 			return True;
+
 class split:
 	def __init__(self, args):
 		self.dir = args.dir;
 		self.oformat = args.oformat;
+		self.number = args.number;
+		self.counter = 0;
 		if not os.path.exists(self.dir):
 			os.mkdir(self.dir);
-	
 	def run(self, seq):
-		return os.path.join(self.dir, ".".join([seq.id, self.oformat]));
+		if self.number <= 1:
+			return os.path.join(self.dir, ".".join([seq.id, self.oformat]));
+		else:
+			self.counter += 1;
+			return os.path.join(self.dir, ".".join(["seq"+str(self.counter // self.number), self.oformat]));
 
 class stat:
 	def __init__(self, args):
-		self.gc123 = args.gc123;
+		self.seqid = args.seqid;
+		self.length = args.length;
+		self.alphabet = args.alphabet;
+		self.gc = args.gc;
 		self.weight = args.weight;
 		self.checksum = args.checksum;
 		self.desc = args.desc;
-		self.isopoint = args.isopoint;
-		self.meltpoint = args.meltpoint;
-		self.icc = args.icc;
+		self.lcc = args.lcc;
+	
+	def getlcc(self, seq):
+		if self.lcc == "simp":
+			return "{:2.2f}".format(lcc_simp(seq));
+		else:
+			res = re.match(r'mult\:(\d+)', self.lcc, re.I);
+			if res:
+				items = [];
+				for lc in lcc_mult(seq, int(res.group(1))):
+					items.append("{:2.2f}".format(lc));
+				return "\t".join(items);
+			else:
+				return "";
 	
 	def run(self, seq):
-		items = [seq.id, str(len(seq))];
-		if self.gc123:
-			for gc in SeqUtils.GC123(seq.seq):
-				items.append("{:2.2f}".format(gc));
-		else:
-			items.append("{:2.2f}".format(SeqUtils.GC(seq.seq)));
+		items = [];
+		if self.seqid:
+			items.append(seq.id);
+		if self.length:
+			items.append(str(len(seq)));
 		if self.weight:
 			items.append("{:.2f}".format(SeqUtils.molecular_weight(seq.seq)));
+		if self.alphabet == "dna":
+			if self.gc == "gc123":
+				for gc in SeqUtils.GC123(seq.seq):
+					items.append("{:2.2f}".format(gc));
+			else:
+				items.append("{:2.2f}".format(SeqUtils.GC(seq.seq)));
+			if self.lcc:
+				items.append(self.getlcc(seq.seq));
 		if self.checksum:
 			cksum = CHECKSUM[self.checksum](seq.seq);
 			if type(cksum) is int:
