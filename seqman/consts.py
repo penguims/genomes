@@ -96,15 +96,3 @@ CHECKSUM = {
 		"crc64":crc64
 	};
 
-#Show items
-SHOWITEM = {
-		"codon":CODON,
-		"format":FORMAT,
-	};
-
-#Show ites
-def showitem(args):
-	for itn in args.show:
-		print("{} list: ".format(itn));
-		for it in SHOWITEM[itn].keys():
-			print("\t{}:\t{}".format(it, SHOWITEM[itn][it]));
